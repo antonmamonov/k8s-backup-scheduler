@@ -25,3 +25,13 @@ RUN cp /usr/local/go/bin/go /usr/bin/go
 RUN cp /usr/local/go/bin/gofmt /usr/bin/gofmt
 
 ENV GOLANG_VERSION 1.19.3
+
+# copy over source code and build
+COPY . .
+RUN go build -o main .
+RUN mv main /usr/bin/main
+
+# delete source code
+RUN rm -rf /app
+
+ENTRYPOINT [ "/usr/bin/main" ]

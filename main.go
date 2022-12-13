@@ -3,12 +3,44 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"time"
 
+	"github.com/antonmamonov/k8s-backup-scheduler/backup"
 	"github.com/antonmamonov/k8s-backup-scheduler/k8sutils"
+	"github.com/antonmamonov/k8s-backup-scheduler/sync"
 	"github.com/cristalhq/acmd"
 )
+
+type generalFlags struct {
+	IsVerbose                  bool
+	SourceVolumeName           string
+	SourceVolumeNamespace      string
+	DestinationVolumeName      string
+	DestinationVolumeNamespace string
+}
+
+func (c *generalFlags) Flags() *flag.FlagSet {
+	fs := flag.NewFlagSet("", flag.ContinueOnError)
+	fs.BoolVar(&c.IsVerbose, "verbose", false, "should be verbose")
+	fs.StringVar(&c.SourceVolumeName, "sourcevolumename", "pvc-1", "The source persistent volume name")
+	fs.StringVar(&c.SourceVolumeNamespace, "sourcevolumenamespace", "default", "The source persistent volume namespace")
+	fs.StringVar(&c.DestinationVolumeName, "destinationvolumename", "pvc-2", "The destination persistent volume name")
+	fs.StringVar(&c.DestinationVolumeNamespace, "destinationvolumenamespace", "default", "The destination persistent volume namespace")
+	return fs
+}
+
+type commandFlags struct {
+	generalFlags
+	File string
+}
+
+func (c *commandFlags) Flags() *flag.FlagSet {
+	fs := c.generalFlags.Flags()
+	fs.StringVar(&c.File, "file", "input.txt", "file to process")
+	return fs
+}
 
 func main() {
 
@@ -43,6 +75,38 @@ func main() {
 			Name:        "backup",
 			Description: "Back up a persistent volume to a source volume",
 			ExecFunc: func(ctx context.Context, args []string) error {
+
+				// get command flags
+				var cfg backup.BackupVolumeFlags
+				if err := cfg.Flags().Parse(args); err != nil {
+					return err
+				}
+
+				backupVolumeError := backup.BackupVolume(&cfg)
+
+				if backupVolumeError != nil {
+					return backupVolumeError
+				}
+
+				return nil
+			},
+		},
+		{
+			Name:        "sync",
+			Description: "synchronize a persistent volume to a destination folder",
+			ExecFunc: func(ctx context.Context, args []string) error {
+
+				// get command flags
+				var cfg sync.SyncVolumeFlags
+				if err := cfg.Flags().Parse(args); err != nil {
+					return err
+				}
+
+				syncVolumeError := sync.SyncVolume(&cfg)
+
+				if syncVolumeError != nil {
+					return syncVolumeError
+				}
 
 				return nil
 			},
