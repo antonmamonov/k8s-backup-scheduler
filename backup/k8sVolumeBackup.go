@@ -96,6 +96,40 @@ func BackupVolume(k8sVolumeBackupConfig *BackupVolumeFlags) error {
 
 	jobName := "backup-job-" + k8sVolumeBackupConfig.DestinationVolumeName
 
+	jobVolumeMounts := []v1.VolumeMount{
+		{
+			Name:      "destination-volume",
+			MountPath: "/backup",
+		},
+
+		// Additional Volume Mount for remote development if needed ;) ask and you shall receive
+		// {
+		// 	Name:      "app-development",
+		// 	MountPath: "/app",
+		// },
+	}
+
+	jobVolumes := []v1.Volume{
+		{
+			Name: "destination-volume",
+			VolumeSource: v1.VolumeSource{
+				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+					ClaimName: k8sVolumeBackupConfig.DestinationVolumeName,
+				},
+			},
+		},
+
+		// Additional Volume for remote development if needed ;) ask and you shall receive
+		// {
+		// 	Name: "app-development",
+		// 	VolumeSource: v1.VolumeSource{
+		// 		PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+		// 			ClaimName: "anton-remotecodeweb-pv-claim-workdir",
+		// 		},
+		// 	},
+		// },
+	}
+
 	syncK8sJob := batchv1.Job{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Job",
@@ -118,24 +152,10 @@ func BackupVolume(k8sVolumeBackupConfig *BackupVolumeFlags) error {
 								"-c",
 								"sleep 9999;",
 							},
-							VolumeMounts: []v1.VolumeMount{
-								{
-									Name:      "destination-volume",
-									MountPath: "/backup",
-								},
-							},
+							VolumeMounts: jobVolumeMounts,
 						},
 					},
-					Volumes: []v1.Volume{
-						{
-							Name: "destination-volume",
-							VolumeSource: v1.VolumeSource{
-								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-									ClaimName: k8sVolumeBackupConfig.DestinationVolumeName,
-								},
-							},
-						},
-					},
+					Volumes: jobVolumes,
 				},
 			},
 		},

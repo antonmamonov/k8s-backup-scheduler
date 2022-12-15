@@ -11,7 +11,7 @@ RUN apt-get install -y \
     git \
     make \
     wget \
-    tmux
+    curl
 
 WORKDIR /app
 
@@ -25,6 +25,15 @@ RUN cp /usr/local/go/bin/go /usr/bin/go
 RUN cp /usr/local/go/bin/gofmt /usr/bin/gofmt
 
 ENV GOLANG_VERSION 1.19.3
+
+# Install kubectl
+ENV KUBECTL_VERSION v1.23.13
+RUN curl -LO https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl
+
+ENV KUBECTL_CHECKSUM fae6957e6a7047ad49cdd20976cd2ce9188b502c831fbf61f36618ea1188ba38
+RUN echo "${KUBECTL_CHECKSUM}  kubectl" | sha256sum --check
+RUN chmod +x kubectl
+RUN mv kubectl /usr/local/bin/kubectl
 
 # copy over source code and build
 COPY . .

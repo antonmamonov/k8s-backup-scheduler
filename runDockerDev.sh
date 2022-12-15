@@ -7,6 +7,7 @@ docker rm -f $CONTAINERNAME
 
 docker run -t -d \
     --name $CONTAINERNAME \
+    --entrypoint="/bin/bash" \
     -v $PWD:/app \
     -v $HOME/.kube/config:/root/.kube/config \
     $IMAGENAME

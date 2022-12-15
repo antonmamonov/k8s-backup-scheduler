@@ -4,7 +4,7 @@
 
 ## Prerequisite
 
-Given this needs access to your Kubernetes cluster to backup a volume it would require an authenticated context. The docker assumes a working Kubernetes config file at `$HOME/.kube/config`.
+Given this needs access to your Kubernetes cluster to backup a volume it would require an authenticated context. The running docker container assumes a working Kubernetes config file at `$HOME/.kube/config` to do work.
 
 ## Quick Backup Volume Job
 
