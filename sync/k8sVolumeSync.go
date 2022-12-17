@@ -3,8 +3,6 @@ package sync
 import (
 	"flag"
 	"fmt"
-
-	"github.com/antonmamonov/k8s-backup-scheduler/k8sutils"
 )
 
 type SyncVolumeFlags struct {
@@ -27,21 +25,11 @@ func SyncVolume(syncVolumeConfig *SyncVolumeFlags) error {
 
 	fmt.Println("syncVolumeConfig", syncVolumeConfig)
 
-	_, getK8sClusterConfigError := k8sutils.GetK8sClusterConfig()
+	// build kubectl cp command
+	// kubectl cp <namespace>/<pod-name>:/path/to/remote/file /path/to/local/file
+	kubectlCpString := fmt.Sprintf("kubectl cp %s/%s:%s %s", syncVolumeConfig.SourcePodNamespace, syncVolumeConfig.SourcePodName, syncVolumeConfig.SourcePodDirectory, syncVolumeConfig.DestinationDirectory)
 
-	if getK8sClusterConfigError != nil {
-		return getK8sClusterConfigError
-	}
-
-	// get status of persistent source volume using the k8sConfig
-	// pVolume, getPVolumeError := k8sConfig.ClientSet.CoreV1().PersistentVolumeClaims(syncVolumeConfig.SourceVolumeNamespace).Get(context.TODO(), syncVolumeConfig.SourceVolumeName, metav1.GetOptions{})
-
-	// if getPVolumeError != nil {
-	// 	return getPVolumeError
-	// }
-
-	// // get status of pVolumes
-	// fmt.Printf("pVolume: %s\n", &pVolume.Status)
+	fmt.Println("kubectlCpString", kubectlCpString)
 
 	return nil
 }
