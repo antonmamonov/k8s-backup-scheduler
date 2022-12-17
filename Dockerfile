@@ -37,10 +37,10 @@ RUN mv kubectl /usr/local/bin/kubectl
 
 # copy over source code and build
 COPY . .
-RUN go build -o main .
-RUN mv main /usr/bin/main
+RUN go build -o kubebackup .
+RUN mv kubebackup /usr/bin/kubebackup
 
 # delete source code
 RUN rm -rf /app
 
-ENTRYPOINT [ "/usr/bin/main" ]
+ENTRYPOINT [ "/usr/bin/kubebackup" ]
