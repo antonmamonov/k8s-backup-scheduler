@@ -5,6 +5,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/antonmamonov/k8s-backup-scheduler/backup"
@@ -100,6 +101,22 @@ func main() {
 				var cfg sync.SyncVolumeFlags
 				if err := cfg.Flags().Parse(args); err != nil {
 					return err
+				}
+
+				if os.Getenv("SOURCE_POD_NAME") != "" {
+					cfg.SourcePodName = os.Getenv("SOURCE_POD_NAME")
+				}
+
+				if os.Getenv("SOURCE_POD_NAMESPACE") != "" {
+					cfg.SourcePodNamespace = os.Getenv("SOURCE_POD_NAMESPACE")
+				}
+
+				if os.Getenv("SOURCE_POD_DIRECTORY") != "" {
+					cfg.SourcePodDirectory = os.Getenv("SOURCE_POD_DIRECTORY")
+				}
+
+				if os.Getenv("DESTINATION_DIRECTORY") != "" {
+					cfg.DestinationDirectory = os.Getenv("DESTINATION_DIRECTORY")
 				}
 
 				syncVolumeError := sync.SyncVolume(&cfg)

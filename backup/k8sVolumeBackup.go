@@ -258,6 +258,62 @@ func BackupVolume(k8sVolumeBackupConfig *BackupVolumeFlags) error {
 		},
 	}
 
+	SourcePodName := ""
+	SourcePodNamespace := k8sVolumeBackupConfig.SourceVolumeNamespace
+	SourcePodDirectory := ""
+	SourcePodVolumeMountName := ""
+	DestinationDirectory := "/backup"
+
+	// find pod that has the volume claim attached
+	pods, listPodsError := k8sConfig.ClientSet.CoreV1().Pods(k8sVolumeBackupConfig.SourceVolumeNamespace).List(context.TODO(), metav1.ListOptions{})
+
+	if listPodsError != nil {
+		return listPodsError
+	}
+
+	// loop through the pods and find the pod that has the volume claim attached
+	for _, pod := range pods.Items {
+		for _, volume := range pod.Spec.Volumes {
+			if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == k8sVolumeBackupConfig.SourceVolumeName {
+				SourcePodName = pod.Name
+				SourcePodNamespace = pod.Namespace
+				SourcePodVolumeMountName = volume.Name
+			}
+		}
+	}
+
+	// through the pods and find the volume mount that has the volume claim attached
+	for _, pod := range pods.Items {
+		for _, container := range pod.Spec.Containers {
+			for _, volumeMount := range container.VolumeMounts {
+				if volumeMount.Name == SourcePodVolumeMountName {
+					SourcePodDirectory = volumeMount.MountPath
+				}
+			}
+		}
+	}
+
+	// pass as environment variables to the backup job
+
+	syncK8sEnvVar := []v1.EnvVar{
+		{
+			Name:  "SOURCE_POD_NAME",
+			Value: SourcePodName,
+		},
+		{
+			Name:  "SOURCE_POD_NAMESPACE",
+			Value: SourcePodNamespace,
+		},
+		{
+			Name:  "SOURCE_POD_DIRECTORY",
+			Value: SourcePodDirectory,
+		},
+		{
+			Name:  "DESTINATION_DIRECTORY",
+			Value: DestinationDirectory,
+		},
+	}
+
 	syncK8sJob := batchv1.Job{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Job",
@@ -281,6 +337,7 @@ func BackupVolume(k8sVolumeBackupConfig *BackupVolumeFlags) error {
 								"sleep 9999;",
 							},
 							VolumeMounts: jobVolumeMounts,
+							Env:          syncK8sEnvVar,
 						},
 					},
 					Volumes: jobVolumes,
