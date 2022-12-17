@@ -6,16 +6,20 @@
 
 Given this needs access to your Kubernetes cluster to backup a volume it would require an authenticated context. The running docker container assumes a working Kubernetes config file at `$HOME/.kube/config` to do work.
 
-## Quick Backup Volume Job
+## Quick run kubebackup CLI
 
 ```bash
-# setup docker container
-./runDockerProd.sh
+# build the cli for your environment if needed
+go build -o kubebackup .
 
-# inside the running docker container
-main help
+# copy over the executable to your system's bin folder
+sudo cp ./kubebackup /usr/local/bin/kubebackup
 
-main backup --help
+# See all commands
+kubebackup help
+
+# See the backup command
+kubebackup backup --help
 ```
 
 ## Backup Scheduling

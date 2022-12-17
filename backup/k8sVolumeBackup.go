@@ -5,11 +5,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/antonmamonov/k8s-backup-scheduler/k8sutils"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -92,6 +94,120 @@ func BackupVolume(k8sVolumeBackupConfig *BackupVolumeFlags) error {
 
 	// sleep for a few seconds to allow the volume to be created
 	time.Sleep(3 * time.Second)
+
+	// create a new cluster role with the required permissions to access the source volume's pod in the namespace
+	clusterRoleName := "backup-cluster-role"
+
+	// check if the cluster role already exists
+	_, getClusterRoleError := k8sConfig.ClientSet.RbacV1().ClusterRoles().Get(context.TODO(), clusterRoleName, metav1.GetOptions{})
+
+	if getClusterRoleError != nil {
+		// create the cluster role
+		_, createClusterRoleError := k8sConfig.ClientSet.RbacV1().ClusterRoles().Create(context.TODO(), &rbac.ClusterRole{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "ClusterRole",
+				APIVersion: "rbac.authorization.k8s.io/v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: clusterRoleName,
+			},
+			Rules: []rbac.PolicyRule{
+				{
+					APIGroups: []string{""},
+					Resources: []string{"pods", "persistentvolumeclaims", "persistentvolumes"},
+					Verbs:     []string{"get", "list", "watch"},
+				},
+			},
+		}, metav1.CreateOptions{})
+
+		if createClusterRoleError != nil {
+			return createClusterRoleError
+		}
+
+		fmt.Println("[BackupVolume] Created new ClusterRole:", clusterRoleName)
+	}
+
+	// create the service account
+	serviceAccountName := "backup-service-account"
+
+	// check if the service account already exists
+	_, getServiceAccountError := k8sConfig.ClientSet.CoreV1().ServiceAccounts(k8sVolumeBackupConfig.DestinationVolumeNamespace).Get(context.TODO(), serviceAccountName, metav1.GetOptions{})
+
+	if getServiceAccountError != nil {
+		// create the service account
+		_, createServiceAccountError := k8sConfig.ClientSet.CoreV1().ServiceAccounts(k8sVolumeBackupConfig.DestinationVolumeNamespace).Create(context.TODO(), &v1.ServiceAccount{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "ServiceAccount",
+				APIVersion: "v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: serviceAccountName,
+			},
+		}, metav1.CreateOptions{})
+
+		if createServiceAccountError != nil {
+			return createServiceAccountError
+		}
+
+		fmt.Println("[BackupVolume] Created new ServiceAccount:", serviceAccountName, "in namespace:", k8sVolumeBackupConfig.DestinationVolumeNamespace)
+	}
+
+	// create the cluster role binding
+	clusterRoleBindingName := "backup-cluster-role-binding"
+
+	// check if the cluster role binding already exists
+	_, getClusterRoleBindingError := k8sConfig.ClientSet.RbacV1().ClusterRoleBindings().Get(context.TODO(), clusterRoleBindingName, metav1.GetOptions{})
+
+	if getClusterRoleBindingError != nil {
+		// create the cluster role binding
+		_, createClusterRoleBindingError := k8sConfig.ClientSet.RbacV1().ClusterRoleBindings().Create(context.TODO(), &rbac.ClusterRoleBinding{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "ClusterRoleBinding",
+				APIVersion: "rbac.authorization.k8s.io/v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: clusterRoleBindingName,
+			},
+			Subjects: []rbac.Subject{
+				{
+					Kind:      "ServiceAccount",
+					Name:      serviceAccountName,
+					Namespace: k8sVolumeBackupConfig.DestinationVolumeNamespace,
+				},
+			},
+			RoleRef: rbac.RoleRef{
+				Kind:     "ClusterRole",
+				Name:     clusterRoleName,
+				APIGroup: "rbac.authorization.k8s.io",
+			},
+		}, metav1.CreateOptions{})
+
+		if createClusterRoleBindingError != nil {
+			return createClusterRoleBindingError
+		}
+
+		fmt.Println("[BackupVolume] Created new ClusterRoleBinding:", clusterRoleBindingName)
+	}
+
+	// find the latest backup service token secret
+	backupServiceRegex := regexp.MustCompile(serviceAccountName + `-token-.*`)
+	backupServiceTokenSecretName := ""
+
+	// get the list of secrets in the namespace
+	secrets, listSecretsError := k8sConfig.ClientSet.CoreV1().Secrets(k8sVolumeBackupConfig.DestinationVolumeNamespace).List(context.TODO(), metav1.ListOptions{})
+	if listSecretsError != nil {
+		return listSecretsError
+	}
+
+	// loop through the secrets and find the latest backup service token secret
+	for _, secret := range secrets.Items {
+		if backupServiceRegex.MatchString(secret.Name) {
+			backupServiceTokenSecretName = secret.Name
+		}
+	}
+
+	// check if the service account token secret already exists
+
 	// create a new job with the destination volume attached
 
 	jobName := "backup-job-" + k8sVolumeBackupConfig.DestinationVolumeName
@@ -101,12 +217,16 @@ func BackupVolume(k8sVolumeBackupConfig *BackupVolumeFlags) error {
 			Name:      "destination-volume",
 			MountPath: "/backup",
 		},
+		{
+			Name:      "backup-service-account-token",
+			MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+		},
 
 		// Additional Volume Mount for remote development if needed ;) ask and you shall receive
-		// {
-		// 	Name:      "app-development",
-		// 	MountPath: "/app",
-		// },
+		{
+			Name:      "app-development",
+			MountPath: "/app",
+		},
 	}
 
 	jobVolumes := []v1.Volume{
@@ -118,16 +238,24 @@ func BackupVolume(k8sVolumeBackupConfig *BackupVolumeFlags) error {
 				},
 			},
 		},
+		{
+			Name: "backup-service-account-token",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: backupServiceTokenSecretName,
+				},
+			},
+		},
 
 		// Additional Volume for remote development if needed ;) ask and you shall receive
-		// {
-		// 	Name: "app-development",
-		// 	VolumeSource: v1.VolumeSource{
-		// 		PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-		// 			ClaimName: "anton-remotecodeweb-pv-claim-workdir",
-		// 		},
-		// 	},
-		// },
+		{
+			Name: "app-development",
+			VolumeSource: v1.VolumeSource{
+				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+					ClaimName: "anton-remotecodeweb-pv-claim-workdir",
+				},
+			},
+		},
 	}
 
 	syncK8sJob := batchv1.Job{

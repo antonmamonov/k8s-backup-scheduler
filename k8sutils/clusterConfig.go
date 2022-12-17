@@ -4,6 +4,7 @@ package k8sutils
 import (
 	"context"
 	"fmt"
+	"os"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -16,16 +17,25 @@ type K8sClusterConfig struct {
 
 func GetK8sClusterConfig() (*K8sClusterConfig, error) {
 
+	// get the home directory path
+	homeDir, homeDirError := os.UserHomeDir()
+
+	if homeDirError != nil {
+		return nil, homeDirError
+	}
+
+	fmt.Println("homeDir", homeDir)
+
 	// use the current context in kubeconfig
-	config, err := clientcmd.BuildConfigFromFlags("", "/root/.kube/config")
+	config, err := clientcmd.BuildConfigFromFlags("", homeDir+"/.kube/config")
 	if err != nil {
-		panic(err.Error())
+		return nil, err
 	}
 
 	// create the clientset
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		panic(err.Error())
+		return nil, err
 	}
 
 	k8sClusterConfig := &K8sClusterConfig{
