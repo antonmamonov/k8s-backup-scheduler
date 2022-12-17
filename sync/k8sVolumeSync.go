@@ -3,6 +3,7 @@ package sync
 import (
 	"flag"
 	"fmt"
+	"os/exec"
 )
 
 type SyncVolumeFlags struct {
@@ -27,9 +28,12 @@ func SyncVolume(syncVolumeConfig *SyncVolumeFlags) error {
 
 	// build kubectl cp command
 	// kubectl cp <namespace>/<pod-name>:/path/to/remote/file /path/to/local/file
-	kubectlCpString := fmt.Sprintf("kubectl cp %s/%s:%s %s", syncVolumeConfig.SourcePodNamespace, syncVolumeConfig.SourcePodName, syncVolumeConfig.SourcePodDirectory, syncVolumeConfig.DestinationDirectory)
+	kubectlCpString := fmt.Sprintf("/usr/local/bin/kubectl cp %s/%s:%s %s", syncVolumeConfig.SourcePodNamespace, syncVolumeConfig.SourcePodName, syncVolumeConfig.SourcePodDirectory, syncVolumeConfig.DestinationDirectory)
 
 	fmt.Println("kubectlCpString", kubectlCpString)
 
-	return nil
+	// exec kubectl cp command
+	execCommandError := exec.Command(kubectlCpString).Run()
+
+	return execCommandError
 }

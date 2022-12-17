@@ -115,7 +115,7 @@ func BackupVolume(k8sVolumeBackupConfig *BackupVolumeFlags) error {
 				{
 					APIGroups: []string{""},
 					Resources: []string{"pods", "persistentvolumeclaims", "persistentvolumes"},
-					Verbs:     []string{"get", "list", "watch"},
+					Verbs:     []string{"get", "list", "exec"},
 				},
 			},
 		}, metav1.CreateOptions{})
@@ -221,12 +221,6 @@ func BackupVolume(k8sVolumeBackupConfig *BackupVolumeFlags) error {
 			Name:      "backup-service-account-token",
 			MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
 		},
-
-		// Additional Volume Mount for remote development if needed ;) ask and you shall receive
-		{
-			Name:      "app-development",
-			MountPath: "/app",
-		},
 	}
 
 	jobVolumes := []v1.Volume{
@@ -243,16 +237,6 @@ func BackupVolume(k8sVolumeBackupConfig *BackupVolumeFlags) error {
 			VolumeSource: v1.VolumeSource{
 				Secret: &v1.SecretVolumeSource{
 					SecretName: backupServiceTokenSecretName,
-				},
-			},
-		},
-
-		// Additional Volume for remote development if needed ;) ask and you shall receive
-		{
-			Name: "app-development",
-			VolumeSource: v1.VolumeSource{
-				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-					ClaimName: "anton-remotecodeweb-pv-claim-workdir",
 				},
 			},
 		},
