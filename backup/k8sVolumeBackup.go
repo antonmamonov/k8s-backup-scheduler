@@ -114,8 +114,13 @@ func BackupVolume(k8sVolumeBackupConfig *BackupVolumeFlags) error {
 			Rules: []rbac.PolicyRule{
 				{
 					APIGroups: []string{""},
-					Resources: []string{"pods", "persistentvolumeclaims", "persistentvolumes"},
-					Verbs:     []string{"get", "list", "exec"},
+					Resources: []string{"pods/exec"},
+					Verbs:     []string{"create"},
+				},
+				{
+					APIGroups: []string{""},
+					Resources: []string{"pods", "pods/log"},
+					Verbs:     []string{"get", "list"},
 				},
 			},
 		}, metav1.CreateOptions{})
@@ -188,6 +193,8 @@ func BackupVolume(k8sVolumeBackupConfig *BackupVolumeFlags) error {
 
 		fmt.Println("[BackupVolume] Created new ClusterRoleBinding:", clusterRoleBindingName)
 	}
+
+	time.Sleep(1 * time.Second)
 
 	// find the latest backup service token secret
 	backupServiceRegex := regexp.MustCompile(serviceAccountName + `-token-.*`)

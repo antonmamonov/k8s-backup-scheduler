@@ -24,8 +24,6 @@ func (c *SyncVolumeFlags) Flags() *flag.FlagSet {
 
 func SyncVolume(syncVolumeConfig *SyncVolumeFlags) error {
 
-	fmt.Println("syncVolumeConfig", syncVolumeConfig)
-
 	// build kubectl cp command
 	// kubectl cp <namespace>/<pod-name>:/path/to/remote/file /path/to/local/file
 	kubectlCpString := fmt.Sprintf("/usr/local/bin/kubectl cp %s/%s:%s %s", syncVolumeConfig.SourcePodNamespace, syncVolumeConfig.SourcePodName, syncVolumeConfig.SourcePodDirectory, syncVolumeConfig.DestinationDirectory)
@@ -33,7 +31,7 @@ func SyncVolume(syncVolumeConfig *SyncVolumeFlags) error {
 	fmt.Println("kubectlCpString", kubectlCpString)
 
 	// exec kubectl cp command
-	execCommandError := exec.Command(kubectlCpString).Run()
+	execCommandError := exec.Command("/usr/local/bin/kubectl", "cp", fmt.Sprintf("%s/%s:%s", syncVolumeConfig.SourcePodNamespace, syncVolumeConfig.SourcePodName, syncVolumeConfig.SourcePodDirectory), syncVolumeConfig.DestinationDirectory).Run()
 
 	return execCommandError
 }
