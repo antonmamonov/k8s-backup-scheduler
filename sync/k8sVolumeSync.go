@@ -28,7 +28,8 @@ func SyncVolume(syncVolumeConfig *SyncVolumeFlags) error {
 	// kubectl cp <namespace>/<pod-name>:/path/to/remote/file /path/to/local/file
 	kubectlCpString := fmt.Sprintf("/usr/local/bin/kubectl cp %s/%s:%s %s", syncVolumeConfig.SourcePodNamespace, syncVolumeConfig.SourcePodName, syncVolumeConfig.SourcePodDirectory, syncVolumeConfig.DestinationDirectory)
 
-	fmt.Println("kubectlCpString", kubectlCpString)
+	fmt.Println("Volume copy", kubectlCpString)
+	fmt.Println("[SyncVolume] Copying Volume")
 
 	// exec kubectl cp command
 	execCommandError := exec.Command("/usr/local/bin/kubectl", "cp", fmt.Sprintf("%s/%s:%s", syncVolumeConfig.SourcePodNamespace, syncVolumeConfig.SourcePodName, syncVolumeConfig.SourcePodDirectory), syncVolumeConfig.DestinationDirectory).Run()

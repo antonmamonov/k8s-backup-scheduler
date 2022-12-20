@@ -315,18 +315,25 @@ func BackupVolume(k8sVolumeBackupConfig *BackupVolumeFlags) error {
 			Namespace: k8sVolumeBackupConfig.DestinationVolumeNamespace,
 		},
 		Spec: batchv1.JobSpec{
+			BackoffLimit: func() *int32 { i := int32(7); return &i }(),
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
 					RestartPolicy: "OnFailure",
 					Containers: []v1.Container{
 						{
-							Name:    "main",
-							Image:   "antonm/k8s-pv-backup-scheduler",
-							Command: []string{"/bin/bash"},
+							Name:  "main",
+							Image: "antonm/k8s-pv-backup-scheduler",
+
 							Args: []string{
-								"-c",
-								"sleep 9999;",
+								"sync",
 							},
+
+							// Quick Development
+							// Command: []string{"/bin/bash"},
+							// Args: []string{
+							// 	"-c",
+							// 	"sleep 9999;",
+							// },
 							VolumeMounts: jobVolumeMounts,
 							Env:          syncK8sEnvVar,
 						},
