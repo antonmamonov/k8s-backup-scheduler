@@ -40,4 +40,7 @@ go run ./main.go help
 
 # Use '--help' for a command to get command specific flags
 go run main.go backup --help
+
+# use DEBUG environment variable if needed
+DEBUG=1 go run main.go backup --help
 ```

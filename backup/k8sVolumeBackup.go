@@ -3,8 +3,10 @@ package backup
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"os"
 	"regexp"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -21,6 +24,7 @@ type BackupVolumeFlags struct {
 	SourceVolumeNamespace      string
 	DestinationVolumeName      string
 	DestinationVolumeNamespace string
+	DestinationVolumeSize      int
 }
 
 func (c *BackupVolumeFlags) Flags() *flag.FlagSet {
@@ -29,6 +33,7 @@ func (c *BackupVolumeFlags) Flags() *flag.FlagSet {
 	fs.StringVar(&c.SourceVolumeNamespace, "sourcevolumenamespace", "default", "The source persistent volume claim namespace")
 	fs.StringVar(&c.DestinationVolumeName, "destinationvolumename", "pvc-2", "The destination persistent volume claim name")
 	fs.StringVar(&c.DestinationVolumeNamespace, "destinationvolumenamespace", "default", "The destination persistent volume claim namespace")
+	fs.IntVar(&c.DestinationVolumeSize, "destinationvolumesize", -1, "Manually set the destination volume size (in Gi) if given a value greater than 0. If not set, the destination volume size will be set to the source volume size.")
 	fs.BoolVar(&c.DoOverride, "override", false, "Override and delete existing destination volume (WARNING: THIS WILL DELETE ALL DATA IN DESTINATION VOLUME)")
 	return fs
 }
@@ -53,6 +58,25 @@ func BackupVolume(k8sVolumeBackupConfig *BackupVolumeFlags) error {
 		return fmt.Errorf("pVolume %s is not bound", k8sVolumeBackupConfig.SourceVolumeName)
 	}
 
+	requestsList := sourcePVC.Spec.Resources.Requests
+
+	// if the destination volume size is set, override the source volume size
+	if k8sVolumeBackupConfig.DestinationVolumeSize > 0 {
+		requestsList = v1.ResourceList{
+			v1.ResourceStorage: *resource.NewQuantity(int64(k8sVolumeBackupConfig.DestinationVolumeSize*1024*1024*1024), resource.BinarySI),
+		}
+	}
+
+	// json marshal the requests
+	requestsJSON, _ := json.Marshal(requestsList)
+
+	// stringify the requestsJSON
+	requestsString := string(requestsJSON)
+
+	if os.Getenv("DEBUG") != "" {
+		fmt.Println("destination volume request:", requestsString)
+	}
+
 	newPVCClaim := v1.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "PersistentVolumeClaim",
@@ -65,7 +89,7 @@ func BackupVolume(k8sVolumeBackupConfig *BackupVolumeFlags) error {
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: sourcePVC.Spec.AccessModes,
 			Resources: v1.ResourceRequirements{
-				Requests: sourcePVC.Spec.Resources.Requests,
+				Requests: requestsList,
 			},
 			StorageClassName: sourcePVC.Spec.StorageClassName,
 		},
